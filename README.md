@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/manimohans-farcaster-mcp-badge.png)](https://mseep.ai/app/manimohans-farcaster-mcp)
+
 # Farcaster MCP Server
 
 [![smithery badge](https://smithery.ai/badge/@manimohans/farcaster-mcp)](https://smithery.ai/server/@manimohans/farcaster-mcp)
