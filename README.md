@@ -1,7 +1,5 @@
 # Farcaster MCP Server
 
-[![smithery badge](https://smithery.ai/badge/@manimohans/farcaster-mcp)](https://smithery.ai/server/@manimohans/farcaster-mcp)
-
 An MCP server that provides tools to interact with the Farcaster network ([farcaster.xyz](https://www.farcaster.xyz)), allowing AI models to fetch casts, search channels, and analyze content.
 
 <a href="https://glama.ai/mcp/servers/koo5epnlc7">
@@ -109,14 +107,6 @@ Parameters:
 - `limit` (optional): Maximum number of casts to return (default: 10)
 
 Example query: "Show me the latest casts from the 'aichannel' channel."
-
-## Smithery Configuration
-
-This repository includes the necessary configuration files for Smithery:
-
-- `smithery.yaml`: YAML configuration for Smithery deployment
-- `smithery.json`: JSON configuration for Smithery capabilities
-- `Dockerfile`: Container configuration for Smithery deployment
 
 ## API Details
 
