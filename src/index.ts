@@ -5,18 +5,13 @@ import axios from "axios";
 import { Buffer } from 'buffer';
 import * as process from 'process';
 
-// Farcaster Hubble API base URL
-const HUBBLE_API_BASE = "https://nemes.farcaster.xyz:2281/v1";
+// Farcaster Hubble API base URL (using Pinata's public hub)
+const HUBBLE_API_BASE = "https://hub.pinata.cloud/v1";
 
-// Create MCP server with all capabilities
+// Create MCP server
 const server = new McpServer({
   name: "farcaster-mcp",
   version: "1.0.0",
-  capabilities: {
-    tools: {},
-    resources: {},
-    prompts: {}
-  }
 });
 
 // Types for Farcaster API responses based on actual API structure
@@ -424,7 +419,7 @@ async function main() {
           const response = await fetchFromHubble(`/castsByFid`, {
             fid,
             pageSize: limit,
-            reverse: 1 // Get newest first
+            reverse: true // Get newest first
           }) as FarcasterCastsResponse;
           
           console.error(`Got response with ${response.messages?.length || 0} messages`);
@@ -505,7 +500,7 @@ async function main() {
           // Set up parameters for the API call
           const params: Record<string, any> = {
             pageSize: limit,
-            reverse: 1 // Get newest first
+            reverse: true // Get newest first
           };
           
           // Use url parameter for the API call as shown in the example
@@ -632,7 +627,7 @@ async function main() {
           const response = await fetchFromHubble(`/castsByFid`, {
             fid,
             pageSize: limit,
-            reverse: 1 // Get newest first
+            reverse: true // Get newest first
           }) as FarcasterCastsResponse;
           
           if (!response.messages || response.messages.length === 0) {
