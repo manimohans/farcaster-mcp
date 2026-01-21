@@ -665,7 +665,354 @@ async function main() {
         }
       }
     );
-    
+
+    // Register tool for getting user profile
+    server.tool(
+      "get-user-profile",
+      "Get a Farcaster user's profile information including bio, display name, and profile picture",
+      {
+        fid: z.number().optional().describe("Farcaster user ID (FID)"),
+        username: z.string().optional().describe("Farcaster username (alternative to FID)")
+      },
+      async ({ fid, username }: { fid?: number; username?: string }) => {
+        try {
+          let targetFid = fid;
+
+          // If username provided, look up the FID first
+          if (!targetFid && username) {
+            console.error(`Looking up FID for username: ${username}`);
+            targetFid = await getFidByUsername(username) ?? undefined;
+            if (!targetFid) {
+              return {
+                content: [{ type: "text", text: `User "${username}" not found.` }],
+                isError: true
+              };
+            }
+          }
+
+          if (!targetFid) {
+            return {
+              content: [{ type: "text", text: "Please provide either a FID or username." }],
+              isError: true
+            };
+          }
+
+          console.error(`Fetching profile for FID: ${targetFid}`);
+
+          const userDataResponse = await fetchFromHubble(`/userDataByFid`, { fid: targetFid });
+
+          if (!userDataResponse.messages || userDataResponse.messages.length === 0) {
+            return {
+              content: [{ type: "text", text: `No profile data found for FID ${targetFid}` }]
+            };
+          }
+
+          // Parse user data messages
+          const profile: Record<string, string> = { fid: String(targetFid) };
+
+          for (const message of userDataResponse.messages) {
+            if (message.data?.userDataBody) {
+              const { type, value } = message.data.userDataBody;
+              switch (type) {
+                case "USER_DATA_TYPE_PFP":
+                  profile.pfp = value;
+                  break;
+                case "USER_DATA_TYPE_DISPLAY":
+                  profile.displayName = value;
+                  break;
+                case "USER_DATA_TYPE_BIO":
+                  profile.bio = value;
+                  break;
+                case "USER_DATA_TYPE_USERNAME":
+                  profile.username = value;
+                  break;
+                case "USER_DATA_TYPE_URL":
+                  profile.url = value;
+                  break;
+              }
+            }
+          }
+
+          const profileText = `# Profile: ${profile.displayName || profile.username || `FID ${targetFid}`}
+
+**FID:** ${targetFid}
+**Username:** ${profile.username || "N/A"}
+**Display Name:** ${profile.displayName || "N/A"}
+**Bio:** ${profile.bio || "N/A"}
+**Profile Picture:** ${profile.pfp || "N/A"}
+**URL:** ${profile.url || "N/A"}`;
+
+          return {
+            content: [{ type: "text", text: profileText }]
+          };
+        } catch (error) {
+          console.error("Error in get-user-profile:", error);
+          return {
+            content: [{ type: "text", text: `Error fetching profile: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // Register tool for getting cast reactions (likes and recasts)
+    server.tool(
+      "get-cast-reactions",
+      "Get likes and recasts for a specific cast",
+      {
+        fid: z.number().describe("FID of the cast author"),
+        hash: z.string().describe("Hash of the cast"),
+        type: z.enum(["likes", "recasts", "all"]).optional().describe("Type of reactions to fetch (default: all)")
+      },
+      async ({ fid, hash, type = "all" }: { fid: number; hash: string; type?: "likes" | "recasts" | "all" }) => {
+        try {
+          console.error(`Fetching reactions for cast ${hash} by FID ${fid}`);
+
+          const results: string[] = [];
+
+          // Fetch likes if requested
+          if (type === "likes" || type === "all") {
+            try {
+              const likesResponse = await fetchFromHubble(`/reactionsByCast`, {
+                target_fid: fid,
+                target_hash: hash,
+                reaction_type: "Like",
+                pageSize: 50
+              });
+
+              const likeCount = likesResponse.messages?.length || 0;
+              results.push(`**Likes:** ${likeCount}`);
+
+              if (likeCount > 0 && likeCount <= 10) {
+                const likerFids = likesResponse.messages.map((m: any) => m.data.fid);
+                results.push(`Liked by FIDs: ${likerFids.join(", ")}`);
+              }
+            } catch (error) {
+              console.error("Error fetching likes:", error);
+              results.push("**Likes:** Error fetching");
+            }
+          }
+
+          // Fetch recasts if requested
+          if (type === "recasts" || type === "all") {
+            try {
+              const recastsResponse = await fetchFromHubble(`/reactionsByCast`, {
+                target_fid: fid,
+                target_hash: hash,
+                reaction_type: "Recast",
+                pageSize: 50
+              });
+
+              const recastCount = recastsResponse.messages?.length || 0;
+              results.push(`**Recasts:** ${recastCount}`);
+
+              if (recastCount > 0 && recastCount <= 10) {
+                const recasterFids = recastsResponse.messages.map((m: any) => m.data.fid);
+                results.push(`Recasted by FIDs: ${recasterFids.join(", ")}`);
+              }
+            } catch (error) {
+              console.error("Error fetching recasts:", error);
+              results.push("**Recasts:** Error fetching");
+            }
+          }
+
+          return {
+            content: [{
+              type: "text",
+              text: `# Reactions for Cast\n**Cast:** ${hash}\n**Author FID:** ${fid}\n\n${results.join("\n")}`
+            }]
+          };
+        } catch (error) {
+          console.error("Error in get-cast-reactions:", error);
+          return {
+            content: [{ type: "text", text: `Error fetching reactions: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // Register tool for listing channels
+    server.tool(
+      "list-channels",
+      "List Farcaster channels with optional filtering",
+      {
+        limit: z.number().optional().describe("Maximum number of channels to return (default: 20)"),
+        search: z.string().optional().describe("Search term to filter channels by name or ID")
+      },
+      async ({ limit = 20, search }: { limit?: number; search?: string }) => {
+        try {
+          console.error(`Fetching channels list, limit: ${limit}, search: ${search || "none"}`);
+
+          const response = await axios.get('https://api.warpcast.com/v2/all-channels');
+
+          if (!response.data?.result?.channels) {
+            return {
+              content: [{ type: "text", text: "Failed to fetch channels from Warpcast API" }],
+              isError: true
+            };
+          }
+
+          let channels = response.data.result.channels;
+
+          // Filter by search term if provided
+          if (search) {
+            const searchLower = search.toLowerCase();
+            channels = channels.filter((c: any) =>
+              c.id.toLowerCase().includes(searchLower) ||
+              c.name.toLowerCase().includes(searchLower) ||
+              (c.description && c.description.toLowerCase().includes(searchLower))
+            );
+          }
+
+          // Sort by follower count (most popular first)
+          channels.sort((a: any, b: any) => (b.followerCount || 0) - (a.followerCount || 0));
+
+          // Limit results
+          channels = channels.slice(0, limit);
+
+          if (channels.length === 0) {
+            return {
+              content: [{ type: "text", text: search ? `No channels found matching "${search}"` : "No channels found" }]
+            };
+          }
+
+          const channelList = channels.map((c: any, i: number) =>
+            `${i + 1}. **${c.name}** (/${c.id})
+   Followers: ${c.followerCount || 0} | Members: ${c.memberCount || 0}
+   ${c.description ? c.description.substring(0, 100) + (c.description.length > 100 ? "..." : "") : "No description"}`
+          ).join("\n\n");
+
+          return {
+            content: [{
+              type: "text",
+              text: `# Farcaster Channels${search ? ` matching "${search}"` : ""}\n\n${channelList}`
+            }]
+          };
+        } catch (error) {
+          console.error("Error in list-channels:", error);
+          return {
+            content: [{ type: "text", text: `Error fetching channels: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // Register tool for getting user's following list
+    server.tool(
+      "get-user-following",
+      "Get the list of users that a Farcaster user follows",
+      {
+        fid: z.number().describe("Farcaster user ID (FID)"),
+        limit: z.number().optional().describe("Maximum number of results (default: 25)")
+      },
+      async ({ fid, limit = 25 }: { fid: number; limit?: number }) => {
+        try {
+          console.error(`Fetching following list for FID: ${fid}`);
+
+          const response = await fetchFromHubble(`/linksByFid`, {
+            fid,
+            link_type: "follow",
+            pageSize: limit
+          });
+
+          if (!response.messages || response.messages.length === 0) {
+            return {
+              content: [{ type: "text", text: `FID ${fid} is not following anyone or user not found.` }]
+            };
+          }
+
+          const followingFids = response.messages
+            .filter((m: any) => m.data?.linkBody?.targetFid)
+            .map((m: any) => m.data.linkBody.targetFid);
+
+          // Fetch display names for the first 10 users
+          const displayNames: string[] = [];
+          for (const targetFid of followingFids.slice(0, 10)) {
+            try {
+              const userData = await getUserData(targetFid);
+              displayNames.push(`- FID ${targetFid}: ${userData.displayName || "Unknown"}`);
+            } catch {
+              displayNames.push(`- FID ${targetFid}`);
+            }
+          }
+
+          const moreCount = followingFids.length > 10 ? followingFids.length - 10 : 0;
+
+          return {
+            content: [{
+              type: "text",
+              text: `# Following List for FID ${fid}\n\n**Total shown:** ${followingFids.length}\n\n${displayNames.join("\n")}${moreCount > 0 ? `\n\n...and ${moreCount} more` : ""}`
+            }]
+          };
+        } catch (error) {
+          console.error("Error in get-user-following:", error);
+          return {
+            content: [{ type: "text", text: `Error fetching following list: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true
+          };
+        }
+      }
+    );
+
+    // Register tool for getting user's followers list
+    server.tool(
+      "get-user-followers",
+      "Get the list of users who follow a Farcaster user",
+      {
+        fid: z.number().describe("Farcaster user ID (FID)"),
+        limit: z.number().optional().describe("Maximum number of results (default: 25)")
+      },
+      async ({ fid, limit = 25 }: { fid: number; limit?: number }) => {
+        try {
+          console.error(`Fetching followers list for FID: ${fid}`);
+
+          const response = await fetchFromHubble(`/linksByTargetFid`, {
+            target_fid: fid,
+            link_type: "follow",
+            pageSize: limit
+          });
+
+          if (!response.messages || response.messages.length === 0) {
+            return {
+              content: [{ type: "text", text: `FID ${fid} has no followers or user not found.` }]
+            };
+          }
+
+          const followerFids = response.messages
+            .filter((m: any) => m.data?.fid)
+            .map((m: any) => m.data.fid);
+
+          // Fetch display names for the first 10 users
+          const displayNames: string[] = [];
+          for (const followerFid of followerFids.slice(0, 10)) {
+            try {
+              const userData = await getUserData(followerFid);
+              displayNames.push(`- FID ${followerFid}: ${userData.displayName || "Unknown"}`);
+            } catch {
+              displayNames.push(`- FID ${followerFid}`);
+            }
+          }
+
+          const moreCount = followerFids.length > 10 ? followerFids.length - 10 : 0;
+
+          return {
+            content: [{
+              type: "text",
+              text: `# Followers of FID ${fid}\n\n**Total shown:** ${followerFids.length}\n\n${displayNames.join("\n")}${moreCount > 0 ? `\n\n...and ${moreCount} more` : ""}`
+            }]
+          };
+        } catch (error) {
+          console.error("Error in get-user-followers:", error);
+          return {
+            content: [{ type: "text", text: `Error fetching followers list: ${error instanceof Error ? error.message : String(error)}` }],
+            isError: true
+          };
+        }
+      }
+    );
+
     // Connect to transport
     const transport = new StdioServerTransport();
     await server.connect(transport);
