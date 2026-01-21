@@ -11,6 +11,11 @@ An MCP server that provides tools to interact with the Farcaster network ([farca
 - **Get User Casts**: Retrieve casts from a specific Farcaster user by FID
 - **Get Username Casts**: Retrieve casts from a specific Farcaster user by username
 - **Get Channel Casts**: Retrieve casts from a specific Farcaster channel
+- **Get User Profile**: Get detailed profile information (bio, display name, pfp, etc.)
+- **Get Cast Reactions**: Get likes and recasts for a specific cast
+- **List Channels**: Browse and search Farcaster channels
+- **Get User Following**: See who a user follows
+- **Get User Followers**: See who follows a user
 
 ## Installation
 
@@ -107,6 +112,57 @@ Parameters:
 - `limit` (optional): Maximum number of casts to return (default: 10)
 
 Example query: "Show me the latest casts from the 'aichannel' channel."
+
+#### get-user-profile
+
+Gets detailed profile information for a Farcaster user.
+
+Parameters:
+- `fid` (optional): Farcaster user ID (number)
+- `username` (optional): Farcaster username (string)
+
+Example query: "Get the profile for username 'dwr.eth'."
+
+#### get-cast-reactions
+
+Gets likes and recasts for a specific cast.
+
+Parameters:
+- `fid`: FID of the cast author (number)
+- `hash`: Hash of the cast (string)
+- `type` (optional): Type of reactions - "likes", "recasts", or "all" (default: "all")
+
+Example query: "How many likes does cast 0x1cb62ca3... by FID 6846 have?"
+
+#### list-channels
+
+Lists Farcaster channels with optional search filtering.
+
+Parameters:
+- `limit` (optional): Maximum number of channels to return (default: 20)
+- `search` (optional): Search term to filter channels by name or ID
+
+Example query: "List the top 10 channels about AI."
+
+#### get-user-following
+
+Gets the list of users that a Farcaster user follows.
+
+Parameters:
+- `fid`: Farcaster user ID (number)
+- `limit` (optional): Maximum number of results (default: 25)
+
+Example query: "Who does FID 3 follow?"
+
+#### get-user-followers
+
+Gets the list of users who follow a Farcaster user.
+
+Parameters:
+- `fid`: Farcaster user ID (number)
+- `limit` (optional): Maximum number of results (default: 25)
+
+Example query: "Who follows FID 3?"
 
 ## API Details
 
