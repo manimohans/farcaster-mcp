@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/manimohans-farcaster-mcp-badge.png)](https://mseep.ai/app/manimohans-farcaster-mcp)
+
 # Farcaster MCP Server
 
 An MCP server that provides tools to interact with the Farcaster network ([farcaster.xyz](https://www.farcaster.xyz)), allowing AI models to fetch casts, search channels, and analyze content.
